@@ -18,7 +18,7 @@ public class Wormholy: NSObject
         get { return CustomHTTPProtocol.ignoredHosts }
         set { CustomHTTPProtocol.ignoredHosts = newValue }
     }
-    
+
     /// Limit the logging count
     ///
     @objc public static var limit: NSNumber? {
@@ -34,7 +34,7 @@ public class Wormholy: NSObject
             }
         }
     }
-    
+
     /// Default filter for the search box
     ///
     @objc public static var defaultFilter: String? {
@@ -50,26 +50,26 @@ public class Wormholy: NSObject
             }
         }
     }
-    
+
     // Flag to determine if Wormholy is enabled
     internal static var isEnabled: Bool = true
-    
+
     /// Method to initialize Wormholy
     @objc public static func swiftyLoad() {
         NotificationCenter.default.addObserver(forName: fireWormholy, object: nil, queue: nil) { (notification) in
             Wormholy.presentWormholyFlow()
         }
     }
-    
+
     /// Method to initialize Wormholy with default settings
     @objc public static func swiftyInitialize() {
         if self == Wormholy.self {
             Wormholy.setEnabled(isEnabled)
         }
     }
-    
+
     /// Toggles the tracking of HTTP requests in Wormholy.
-    /// Note: This function does not affect the shake gesture activation of Wormholy. 
+    /// Note: This function does not affect the shake gesture activation of Wormholy.
     /// To control the shake gesture, use the `shakeEnabled` property.
     @objc public static func setEnabled(_ enable: Bool) {
         isEnabled = enable
@@ -79,7 +79,7 @@ public class Wormholy: NSObject
             URLProtocol.unregisterClass(CustomHTTPProtocol.self)
         }
     }
-    
+
     /// Method to enable or disable Wormholy for a specific session configuration
     @objc public static func setEnabled(_ enable: Bool, sessionConfiguration: URLSessionConfiguration) {
         guard sessionConfiguration.responds(to: #selector(getter: URLSessionConfiguration.protocolClasses)) &&
@@ -87,10 +87,10 @@ public class Wormholy: NSObject
             print("[Wormholy] is only available when running on iOS16+")
             return
         }
-        
+
         var urlProtocolClasses = sessionConfiguration.protocolClasses ?? []
         let protoCls = CustomHTTPProtocol.self
-        
+
         if enable {
             if !urlProtocolClasses.contains(where: { $0 == protoCls }) {
                 urlProtocolClasses.insert(protoCls, at: 0)
@@ -102,7 +102,35 @@ public class Wormholy: NSObject
         }
         sessionConfiguration.protocolClasses = urlProtocolClasses
     }
-    
+
+    private static var _shakeEnabled: Bool = {
+        let key = "WORMHOLY_SHAKE_ENABLED"
+
+        if let environmentVariable = ProcessInfo.processInfo.environment[key] {
+            return environmentVariable != "NO"
+        }
+
+        let arguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        if let arg = arguments[key] {
+            switch arg {
+            case let boolean as Bool: return boolean
+            case let string as NSString: return string.boolValue
+            case let number as NSNumber: return number.boolValue
+            default: break
+            }
+        }
+
+        return true
+    }()
+
+    @objc public static func setShakeEnabled(_ enabled: Bool) {
+        _shakeEnabled = enabled
+    }
+
+    @objc public static func isShakeEnabled() -> Bool {
+        return _shakeEnabled
+    }
+
     // MARK: - Navigation
     static func presentWormholyFlow() {
         // Check if RequestsView is already presented
@@ -118,40 +146,20 @@ public class Wormholy: NSObject
         hostingController.modalPresentationStyle = .fullScreen
         UIViewController.currentViewController()?.present(hostingController, animated: true, completion: nil)
     }
-    
-    @objc public static var shakeEnabled: Bool = {
-        let key = "WORMHOLY_SHAKE_ENABLED"
-        
-        if let environmentVariable = ProcessInfo.processInfo.environment[key] {
-            return environmentVariable != "NO"
-        }
-        
-        let arguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
-        if let arg = arguments[key] {
-            switch arg {
-            case let boolean as Bool: return boolean
-            case let string as NSString: return string.boolValue
-            case let number as NSNumber: return number.boolValue
-            default: break
-            }
-        }
-        
-        return true
-    }()
 }
 
 /// WormholyConstructor calls this to initialize library
 extension Wormholy {
-    
+
     @objc static func applicationDidFinishLaunching() {
         initializeAction
     }
-    
+
     private static let initializeAction: Void = {
         swiftyLoad()
         swiftyInitialize()
     }()
-    
+
     // Method to expose isEnabled to Objective-C, for NSURLSessionConfiguration+Wormholy
     @objc public static func isWormholyEnabled() -> Bool {
         return isEnabled
